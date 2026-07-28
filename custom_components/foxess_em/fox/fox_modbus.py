@@ -1,4 +1,6 @@
 import asyncio
+from functools import partial
+import inspect
 import logging
 from typing import Any
 
@@ -53,11 +55,12 @@ class FoxModbus:
         _LOGGER.debug(
             "Reading register: (%d, %d, %d)", start_address, num_registers, slave
         )
+        call = self._client.read_input_registers
         response = await self._async_pymodbus_call(
-            self._client.read_input_registers,
+            call,
             start_address,
-            num_registers,
-            slave,
+            count=num_registers,
+            **self._device_kwargs(call, slave),
         )
 
         if response.isError():
@@ -75,18 +78,20 @@ class FoxModbus:
         try:
             if len(values) > 1:
                 values = [int(i) for i in values]
+                call = self._client.write_registers
                 response = await self._async_pymodbus_call(
-                    self._client.write_registers,
+                    call,
                     address,
                     values,
-                    slave,
+                    **self._device_kwargs(call, slave),
                 )
             else:
+                call = self._client.write_register
                 response = await self._async_pymodbus_call(
-                    self._client.write_register,
+                    call,
                     address,
                     int(values[0]),
-                    slave,
+                    **self._device_kwargs(call, slave),
                 )
             if response.isError():
                 self._write_errors += 1
@@ -122,7 +127,32 @@ class FoxModbus:
             await asyncio.sleep(_WRITE_ERROR_SLEEP)
             await self.write_registers(address, values, slave)
 
-    async def _async_pymodbus_call(self, call, *args):
+    def _device_kwargs(self, call, slave):
+        """Build the device identifier keyword for the installed pymodbus.
+
+        pymodbus made the identifier keyword-only in 3.8 and renamed it from
+        'slave' to 'device_id' in 3.10, so inspect the bound method rather than
+        assume either name.
+        """
+        try:
+            params = inspect.signature(call).parameters
+        except (TypeError, ValueError) as ex:
+            raise TypeError(f"Cannot inspect pymodbus {call.__name__}: {ex}") from ex
+
+        for name in ("device_id", "slave"):
+            if name in params:
+                return {name: slave}
+
+        raise TypeError(
+            f"Unsupported pymodbus version: {call.__name__} accepts neither "
+            "'device_id' nor 'slave'"
+        )
+
+    async def _async_pymodbus_call(self, call, *args, **kwargs):
         """Convert async to sync pymodbus call."""
         async with self._lock:
+            if kwargs:
+                return await self._hass.async_add_executor_job(
+                    partial(call, *args, **kwargs)
+                )
             return await self._hass.async_add_executor_job(call, *args)
