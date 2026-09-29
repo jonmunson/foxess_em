@@ -1,0 +1,17 @@
+{
+  "metadata": {
+    "synthetic": true,
+    "description": "Deterministic seven-day replay fixture; no real household identifiers or measurements.",
+    "timezone": "UTC",
+    "interval": "P1D"
+  },
+  "records": [
+    {"timestamp": "2024-01-01T12:00:00Z", "load_kwh": 8.0, "pv_kwh": 2.0, "soc": 45.0, "capacity_kwh": 10.0, "legacy_target_kwh": 1.20, "reserve_kwh": 0.40},
+    {"timestamp": "2024-01-02T12:00:00Z", "load_kwh": 7.5, "pv_kwh": 5.0, "soc": 50.0, "capacity_kwh": 10.0, "legacy_target_kwh": 0.80, "reserve_kwh": 0.40},
+    {"timestamp": "2024-01-03T12:00:00Z", "load_kwh": 9.0, "pv_kwh": 1.0, "soc": 40.0, "capacity_kwh": 10.0, "legacy_target_kwh": 1.50, "reserve_kwh": 0.50},
+    {"timestamp": "2024-01-04T12:00:00Z", "load_kwh": 6.5, "pv_kwh": 6.0, "soc": 55.0, "capacity_kwh": 10.0, "legacy_target_kwh": 0.40, "reserve_kwh": 0.30},
+    {"timestamp": "2024-01-05T12:00:00Z", "load_kwh": 8.5, "pv_kwh": 3.0, "soc": 48.0, "capacity_kwh": 10.0, "legacy_target_kwh": 1.00, "reserve_kwh": 0.40},
+    {"timestamp": "2024-01-06T12:00:00Z", "load_kwh": 7.0, "pv_kwh": 7.5, "soc": 60.0, "capacity_kwh": 10.0, "legacy_target_kwh": 0.20, "reserve_kwh": 0.20},
+    {"timestamp": "2024-01-07T12:00:00Z", "load_kwh": 9.5, "pv_kwh": 0.5, "soc": 35.0, "capacity_kwh": 10.0, "legacy_target_kwh": 1.80, "reserve_kwh": 0.60}
+  ]
+}

@@ -68,13 +68,13 @@ and you are encouraged to add new ones.
 You can run the tests using the following commands from the root folder:
 
 ```bash
-# Create a virtual environment
-python3 -m venv venv
-source venv/bin/activate
-# Install requirements
-pip install -r requirements_test.txt
+# Create the repository-standard virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+# Install test and lint requirements
+python -m pip install -r requirements_test.txt
 # Run tests and get a summary of successes/failures and code coverage
-pytest --durations=10 --cov-report term-missing --cov=custom_components.foxess_em tests
+python -m pytest --durations=10 --cov-report term-missing --cov=custom_components.foxess_em tests
 ```
 
 If any of the tests fail, make the necessary changes to the tests as part of

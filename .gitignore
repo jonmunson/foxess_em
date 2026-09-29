@@ -17,6 +17,10 @@ config
 replay/
 private/
 exports/
+data/replay/
+tests/fixtures/local/
+*.export.json
+*.secrets.yaml
 *.db
 *.db-shm
 *.db-wal
