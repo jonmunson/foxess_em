@@ -45,6 +45,9 @@ from .const import (
     DOMAIN,
     ECO_END_TIME,
     ECO_START_TIME,
+    ENHANCED_ENABLED,
+    ENHANCED_HISTORY_DAYS,
+    ENHANCED_MODE,
     FOX_API_KEY,
     FOX_CLOUD,
     FOX_MODBUS_HOST,
@@ -85,8 +88,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # fails, which will prevent setup working when the FoxESS API key is fixed.
     entry_options = copy.deepcopy(dict(entry.options))
     entry_data = copy.deepcopy(dict(entry.data))
-    _LOGGER.debug("Options %s", entry.options)
-    _LOGGER.debug("Data %s", entry.data)
+    # Never log complete mappings: they contain API keys, hosts and entity IDs.
+    _LOGGER.debug("Config loaded: options=%s data_keys=%s", bool(entry_options), sorted(entry_data))
 
     if entry_options and entry_options != entry_data:
         # overwrite data with options, force update as not allowed to access entries directly
@@ -96,10 +99,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             version=BatteryManagerFlowHandler.VERSION,
         )
         entry_data = copy.deepcopy(dict(entry.options))
-        _LOGGER.debug("Config has been updated")
-    _LOGGER.debug("Data %s", entry.data)
-
+        _LOGGER.debug("Config options applied: %d keys", len(entry_data))
     connection_type = entry_data.get(CONNECTION_TYPE, FOX_MODBUS_TCP)
+    enhanced_enabled = bool(entry_data.get(ENHANCED_ENABLED, False))
+    _LOGGER.debug("Enhanced shadow: enabled=%s mode=%s history_days=%s", enhanced_enabled, entry_data.get(ENHANCED_MODE, "p50"), entry_data.get(ENHANCED_HISTORY_DAYS, 14))
+
     fox_api_key = entry_data.get(FOX_API_KEY)
     if connection_type == FOX_CLOUD:
         if not fox_api_key:
@@ -203,7 +207,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         },
     }
 
-    # Add callbacks into battery controller for updates
+    if enhanced_enabled:
+        from .enhanced.controller import EnhancedController
+        from .enhanced.snapshot import ReadOnlySnapshotProvider
+        provider = ReadOnlySnapshotProvider(
+            hass, average_controller, forecast_controller, battery_controller,
+            battery_soc, capacity, user_min_soc,
+            max_charge_power_kw=(charge_amps * battery_volts / 1000),
+            fixed_day_buffer_kwh=day_buffer, mode=entry_data.get(ENHANCED_MODE, "p50"),
+            eco_start_time=eco_start_time, eco_end_time=eco_end_time,
+        )
+        enhanced_controller = EnhancedController(True, provider)
+        hass.data[DOMAIN][entry.entry_id]["enhanced"] = enhanced_controller
+        hass.data[DOMAIN][entry.entry_id]["enhanced_provider"] = provider
+        hass.data[DOMAIN][entry.entry_id]["enhanced_unsubscribe"] = battery_controller.add_update_listener(
+            enhanced_controller.update_callback
+        )
+
     forecast_controller.add_update_listener(battery_controller)
     average_controller.add_update_listener(battery_controller)
 
@@ -244,6 +264,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         controllers = hass.data[DOMAIN][entry.entry_id]["controllers"]
         for controller in controllers.values():
             controller.unload()
+        enhanced = hass.data[DOMAIN][entry.entry_id].get("enhanced")
+        if enhanced is not None:
+            unsubscribe = hass.data[DOMAIN][entry.entry_id].get("enhanced_unsubscribe")
+            if unsubscribe:
+                unsubscribe()
+            enhanced.unload()
 
         hass.data[DOMAIN][entry.entry_id]["unload"]()
         hass.data[DOMAIN].pop(entry.entry_id)

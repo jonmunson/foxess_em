@@ -1,8 +1,12 @@
 """Pure enhanced battery target planner; this module has no HA/write-path imports."""
+
 from __future__ import annotations
+
 from dataclasses import dataclass
 import math
-from .models import Diagnostics, EnhancedResult
+
+from .models import Diagnostics
+
 
 @dataclass(frozen=True)
 class PlannerInput:
@@ -16,6 +20,7 @@ class PlannerInput:
     interval_hours: float = 1.0
     reserve_kwh: float = 0.0
     legacy_target_kwh: float = 0.0
+
 
 @dataclass(frozen=True)
 class EnhancedPlan:
@@ -36,13 +41,37 @@ def plan_energy(inp: PlannerInput | None = None, **kwargs) -> EnhancedPlan:
     """
     if inp is None:
         inp = PlannerInput(**kwargs)
-    vals = (inp.load_kwh, inp.pv_kwh, inp.soc, inp.capacity_kwh, inp.min_soc,
-            inp.charge_efficiency, inp.max_charge_power_kw, inp.interval_hours, inp.reserve_kwh)
+    vals = (
+        inp.load_kwh,
+        inp.pv_kwh,
+        inp.soc,
+        inp.capacity_kwh,
+        inp.min_soc,
+        inp.charge_efficiency,
+        inp.max_charge_power_kw,
+        inp.interval_hours,
+        inp.reserve_kwh,
+    )
     if not all(math.isfinite(float(v)) for v in vals if v != math.inf):
-        return EnhancedPlan(0.0, 0.0, max(0.0, inp.reserve_kwh), "error", diagnostics=Diagnostics("error", ("non-finite input",)))
-    if inp.capacity_kwh < 0 or not 0 <= inp.min_soc <= 100 or not 0 <= inp.soc <= 100 or inp.soc < inp.min_soc:
+        return EnhancedPlan(
+            0.0,
+            0.0,
+            max(0.0, inp.reserve_kwh),
+            "error",
+            diagnostics=Diagnostics("error", ("non-finite input",)),
+        )
+    if (
+        inp.capacity_kwh < 0
+        or not 0 <= inp.min_soc <= 100
+        or not 0 <= inp.soc <= 100
+        or inp.soc < inp.min_soc
+    ):
         raise ValueError("invalid battery state")
-    if not 0 < inp.charge_efficiency <= 1 or inp.interval_hours <= 0 or inp.max_charge_power_kw < 0:
+    if (
+        not 0 < inp.charge_efficiency <= 1
+        or inp.interval_hours <= 0
+        or inp.max_charge_power_kw < 0
+    ):
         raise ValueError("invalid charging limits")
     usable = inp.capacity_kwh * max(0.0, inp.soc - inp.min_soc) / 100.0
     needed = max(0.0, inp.load_kwh - inp.pv_kwh) + max(0.0, inp.reserve_kwh)
@@ -50,8 +79,14 @@ def plan_energy(inp: PlannerInput | None = None, **kwargs) -> EnhancedPlan:
     charge = min(charge, inp.max_charge_power_kw * inp.interval_hours)
     status = "surplus_pv" if inp.pv_kwh >= inp.load_kwh else "ok"
     target = charge
-    return EnhancedPlan(target, charge, max(0.0, inp.reserve_kwh), status,
-                        target - inp.legacy_target_kwh,
-                        Diagnostics(status=status))
+    return EnhancedPlan(
+        target,
+        charge,
+        max(0.0, inp.reserve_kwh),
+        status,
+        target - inp.legacy_target_kwh,
+        Diagnostics(status=status),
+    )
+
 
 plan = plan_energy

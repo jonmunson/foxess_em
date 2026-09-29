@@ -26,6 +26,10 @@ from .const import (
     DOMAIN,
     ECO_END_TIME,
     ECO_START_TIME,
+    ENHANCED_DEFAULTS,
+    ENHANCED_ENABLED,
+    ENHANCED_HISTORY_DAYS,
+    ENHANCED_MODE,
     FOX_API_KEY,
     FOX_CLOUD,
     FOX_MODBUS_HOST,
@@ -190,6 +194,13 @@ class BatteryManagerFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                 ),
             }
         )
+        self._enhanced_schema = vol.Schema(
+            {
+                vol.Required(ENHANCED_ENABLED, default=self._data.get(ENHANCED_ENABLED, ENHANCED_DEFAULTS[ENHANCED_ENABLED])): cv.boolean,
+                vol.Required(ENHANCED_MODE, default=self._data.get(ENHANCED_MODE, ENHANCED_DEFAULTS[ENHANCED_MODE])): vol.In(["p10", "p50", "p90", "blend"]),
+                vol.Required(ENHANCED_HISTORY_DAYS, default=self._data.get(ENHANCED_HISTORY_DAYS, ENHANCED_DEFAULTS[ENHANCED_HISTORY_DAYS])): vol.All(vol.Coerce(int), vol.Range(min=7, max=30)),
+            }
+        )
 
     async def async_step_reauth(self, user_input=None):
         """Perform reauth upon an API authentication error."""
@@ -351,9 +362,16 @@ class BatteryManagerFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle a flow initialized by the user."""
         if user_input is not None:
             self._user_input.update(user_input)
-            return self.async_create_entry(title=_TITLE, data=self._user_input)
+            return await self.async_step_enhanced()
 
         return self.async_show_form(step_id="power", data_schema=self._power_schema)
+
+    async def async_step_enhanced(self, user_input: dict[str, Any] = None):
+        """Configure optional read-only shadow planning."""
+        if user_input is not None:
+            self._user_input.update(user_input)
+            return self.async_create_entry(title=_TITLE, data=self._user_input)
+        return self.async_show_form(step_id="enhanced", data_schema=self._enhanced_schema)
 
     def _parse_time(self, eco_start, eco_end):
         try:

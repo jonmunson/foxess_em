@@ -52,6 +52,12 @@ BATTERY_SOC = "battery_soc"
 CHARGE_AMPS = "charge_amps"
 BATTERY_VOLTS = "battery_volts"
 
+# Enhanced planner options (namespaced and disabled for existing entries).
+ENHANCED_ENABLED = "enhanced_enabled"
+ENHANCED_MODE = "enhanced_mode"
+ENHANCED_HISTORY_DAYS = "enhanced_history_days"
+ENHANCED_DEFAULTS = {ENHANCED_ENABLED: False, ENHANCED_MODE: "p50", ENHANCED_HISTORY_DAYS: 14}
+
 
 # Connection types
 class Connection(Enum):
