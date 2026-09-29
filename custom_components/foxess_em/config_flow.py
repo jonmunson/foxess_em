@@ -196,9 +196,24 @@ class BatteryManagerFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         )
         self._enhanced_schema = vol.Schema(
             {
-                vol.Required(ENHANCED_ENABLED, default=self._data.get(ENHANCED_ENABLED, ENHANCED_DEFAULTS[ENHANCED_ENABLED])): cv.boolean,
-                vol.Required(ENHANCED_MODE, default=self._data.get(ENHANCED_MODE, ENHANCED_DEFAULTS[ENHANCED_MODE])): vol.In(["p10", "p50", "p90", "blend"]),
-                vol.Required(ENHANCED_HISTORY_DAYS, default=self._data.get(ENHANCED_HISTORY_DAYS, ENHANCED_DEFAULTS[ENHANCED_HISTORY_DAYS])): vol.All(vol.Coerce(int), vol.Range(min=7, max=30)),
+                vol.Required(
+                    ENHANCED_ENABLED,
+                    default=self._data.get(
+                        ENHANCED_ENABLED, ENHANCED_DEFAULTS[ENHANCED_ENABLED]
+                    ),
+                ): cv.boolean,
+                vol.Required(
+                    ENHANCED_MODE,
+                    default=self._data.get(
+                        ENHANCED_MODE, ENHANCED_DEFAULTS[ENHANCED_MODE]
+                    ),
+                ): vol.In(["p10", "p50", "p90", "blend"]),
+                vol.Required(
+                    ENHANCED_HISTORY_DAYS,
+                    default=self._data.get(
+                        ENHANCED_HISTORY_DAYS, ENHANCED_DEFAULTS[ENHANCED_HISTORY_DAYS]
+                    ),
+                ): vol.All(vol.Coerce(int), vol.Range(min=7, max=30)),
             }
         )
 
@@ -371,7 +386,9 @@ class BatteryManagerFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._user_input.update(user_input)
             return self.async_create_entry(title=_TITLE, data=self._user_input)
-        return self.async_show_form(step_id="enhanced", data_schema=self._enhanced_schema)
+        return self.async_show_form(
+            step_id="enhanced", data_schema=self._enhanced_schema
+        )
 
     def _parse_time(self, eco_start, eco_end):
         try:
@@ -432,4 +449,40 @@ class BatteryManagerFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry: ConfigEntry):
         """Get the options flow for this handler."""
-        return BatteryManagerFlowHandler(config=config_entry)
+        return EnhancedOptionsFlowHandler(config_entry)
+
+
+class EnhancedOptionsFlowHandler(config_entries.OptionsFlow):
+    """Edit enhanced settings without repeating credentials."""
+
+    def __init__(self, config_entry):
+        self._config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    ENHANCED_ENABLED,
+                    default=self._config_entry.options.get(
+                        ENHANCED_ENABLED,
+                        self._config_entry.data.get(ENHANCED_ENABLED, False),
+                    ),
+                ): cv.boolean,
+                vol.Required(
+                    ENHANCED_MODE,
+                    default=self._config_entry.options.get(
+                        ENHANCED_MODE, self._config_entry.data.get(ENHANCED_MODE, "p50")
+                    ),
+                ): vol.In(["p10", "p50", "p90", "blend"]),
+                vol.Required(
+                    ENHANCED_HISTORY_DAYS,
+                    default=self._config_entry.options.get(
+                        ENHANCED_HISTORY_DAYS,
+                        self._config_entry.data.get(ENHANCED_HISTORY_DAYS, 14),
+                    ),
+                ): vol.All(vol.Coerce(int), vol.Range(min=7, max=30)),
+            }
+        )
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+        return self.async_show_form(step_id="init", data_schema=schema)

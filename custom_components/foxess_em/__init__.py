@@ -64,6 +64,7 @@ from .const import (
     Connection,
 )
 from .forecast.forecast_controller import ForecastController
+from .enhanced.settings import normalize_settings
 from .forecast.solcast_api import SolcastApiClient
 from .fox.fox_cloud_api import FoxCloudApiClient
 from .fox.fox_cloud_service import FoxCloudService
@@ -89,20 +90,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     entry_options = copy.deepcopy(dict(entry.options))
     entry_data = copy.deepcopy(dict(entry.data))
     # Never log complete mappings: they contain API keys, hosts and entity IDs.
-    _LOGGER.debug("Config loaded: options=%s data_keys=%s", bool(entry_options), sorted(entry_data))
+    _LOGGER.debug(
+        "Config loaded: options=%s data_keys=%s",
+        bool(entry_options),
+        sorted(entry_data),
+    )
 
-    if entry_options and entry_options != entry_data:
-        # overwrite data with options, force update as not allowed to access entries directly
-        hass.config_entries.async_update_entry(
-            entry,
-            data=entry_options,
-            version=BatteryManagerFlowHandler.VERSION,
-        )
-        entry_data = copy.deepcopy(dict(entry.options))
-        _LOGGER.debug("Config options applied: %d keys", len(entry_data))
+    entry_data.update(entry_options)
     connection_type = entry_data.get(CONNECTION_TYPE, FOX_MODBUS_TCP)
-    enhanced_enabled = bool(entry_data.get(ENHANCED_ENABLED, False))
-    _LOGGER.debug("Enhanced shadow: enabled=%s mode=%s history_days=%s", enhanced_enabled, entry_data.get(ENHANCED_MODE, "p50"), entry_data.get(ENHANCED_HISTORY_DAYS, 14))
+    enhanced = normalize_settings(entry_data)
+    enhanced_enabled = enhanced[ENHANCED_ENABLED]
+    _LOGGER.debug(
+        "Enhanced shadow settings normalized: enabled=%s mode=%s history_days=%s",
+        enhanced_enabled,
+        enhanced[ENHANCED_MODE],
+        enhanced[ENHANCED_HISTORY_DAYS],
+    )
 
     fox_api_key = entry_data.get(FOX_API_KEY)
     if connection_type == FOX_CLOUD:
@@ -210,19 +213,33 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     if enhanced_enabled:
         from .enhanced.controller import EnhancedController
         from .enhanced.snapshot import ReadOnlySnapshotProvider
+
         provider = ReadOnlySnapshotProvider(
-            hass, average_controller, forecast_controller, battery_controller,
-            battery_soc, capacity, user_min_soc,
+            hass,
+            average_controller,
+            forecast_controller,
+            battery_controller,
+            battery_soc,
+            capacity,
+            user_min_soc,
             max_charge_power_kw=(charge_amps * battery_volts / 1000),
-            fixed_day_buffer_kwh=day_buffer, mode=entry_data.get(ENHANCED_MODE, "p50"),
-            eco_start_time=eco_start_time, eco_end_time=eco_end_time,
+            fixed_day_buffer_kwh=day_buffer,
+            mode=enhanced[ENHANCED_MODE],
+            eco_start_time=eco_start_time,
+            eco_end_time=eco_end_time,
         )
         enhanced_controller = EnhancedController(True, provider)
         hass.data[DOMAIN][entry.entry_id]["enhanced"] = enhanced_controller
         hass.data[DOMAIN][entry.entry_id]["enhanced_provider"] = provider
-        hass.data[DOMAIN][entry.entry_id]["enhanced_unsubscribe"] = battery_controller.add_update_listener(
-            enhanced_controller.update_callback
+        hass.data[DOMAIN][entry.entry_id]["enhanced_unsubscribe"] = (
+            battery_controller.add_update_listener(enhanced_controller.update_callback)
         )
+        try:
+            enhanced_controller.update()
+        except Exception:  # defensive: enhanced must not block legacy setup
+            _LOGGER.warning(
+                "Initial enhanced update failed; continuing legacy setup", exc_info=True
+            )
 
     forecast_controller.add_update_listener(battery_controller)
     average_controller.add_update_listener(battery_controller)

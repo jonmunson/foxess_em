@@ -56,7 +56,12 @@ BATTERY_VOLTS = "battery_volts"
 ENHANCED_ENABLED = "enhanced_enabled"
 ENHANCED_MODE = "enhanced_mode"
 ENHANCED_HISTORY_DAYS = "enhanced_history_days"
-ENHANCED_DEFAULTS = {ENHANCED_ENABLED: False, ENHANCED_MODE: "p50", ENHANCED_HISTORY_DAYS: 14}
+ENHANCED_DEFAULTS = {
+    ENHANCED_ENABLED: False,
+    ENHANCED_MODE: "p50",
+    ENHANCED_HISTORY_DAYS: 14,
+}
+ENHANCED_MODES = ("p10", "p50", "p90", "blend")
 
 
 # Connection types

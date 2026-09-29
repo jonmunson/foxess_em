@@ -1,6 +1,7 @@
 """Tests for the read-only Home Assistant snapshot adapter."""
 
 from datetime import datetime, time, timezone
+from zoneinfo import ZoneInfo
 from types import SimpleNamespace
 
 import pandas as pd
@@ -131,3 +132,37 @@ def test_snapshot_rejects_forecast_without_rows_in_horizon():
         provider(frame=frame)()
 
     assert error.value.diagnostics[0] == "forecast_unavailable"
+
+
+@pytest.mark.parametrize(
+    ("now", "expected"),
+    [
+        (datetime(2026, 3, 28, 1, tzinfo=timezone.utc), 294.0),
+        (datetime(2026, 10, 24, 1, tzinfo=timezone.utc), 315.0),
+    ],
+)
+def test_snapshot_horizon_handles_london_dst_transitions(now, expected):
+    index = pd.date_range(
+        now.astimezone(ZoneInfo("Europe/London")).replace(
+            hour=0, minute=30, second=0, microsecond=0
+        ),
+        periods=30,
+        freq="h",
+    )
+    source = ReadOnlySnapshotProvider(
+        SimpleNamespace(states=States()),
+        Average(),
+        Forecast(pd.DataFrame({"pv_estimate": range(len(index))}, index=index)),
+        Battery(),
+        "sensor.battery_soc",
+        10.0,
+        0.1,
+        fixed_day_buffer_kwh=0,
+        eco_start_time=time(0, 30),
+        eco_end_time=time(4, 30),
+        now=lambda: now,
+    )
+
+    planner_input, _legacy = source()
+
+    assert planner_input.pv_kwh == expected

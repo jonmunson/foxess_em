@@ -21,6 +21,20 @@ def test_controller_provider_disabled_and_listener_unsubscribe():
     assert disabled.update_callback().status == "disabled"
 
 
+def test_controller_initial_update_invokes_enabled_provider():
+    calls = []
+
+    def provider():
+        calls.append(1)
+        return snapshot()
+
+    controller = EnhancedController(True, provider)
+    controller.update()
+
+    assert calls == [1]
+    assert controller.status == "ok"
+
+
 def test_controller_provider_error_is_diagnostic():
     controller = EnhancedController(True, lambda: (_ for _ in ()).throw(RuntimeError()))
     result = controller.update_callback()
