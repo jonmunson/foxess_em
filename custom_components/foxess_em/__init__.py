@@ -309,25 +309,28 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     if unloaded:
-        controllers = hass.data[DOMAIN][entry.entry_id]["controllers"]
-        for controller in controllers.values():
-            controller.unload()
-        enhanced = hass.data[DOMAIN][entry.entry_id].get("enhanced")
+        entry_state = hass.data[DOMAIN][entry.entry_id]
+        enhanced = entry_state.get("enhanced")
         if enhanced is not None:
-            enhanced_average = hass.data[DOMAIN][entry.entry_id].get("enhanced_average")
-            if enhanced_average is not None:
-                enhanced_average.unload()
-            unsubscribe = hass.data[DOMAIN][entry.entry_id].get(
-                "enhanced_history_unsubscribe"
-            )
+            # Detach cross-controller listeners before unloading either side.
+            # This is safe with today's no-op listener return values and avoids
+            # stale callbacks if controllers later return real unsubscribe hooks.
+            unsubscribe = entry_state.get("enhanced_history_unsubscribe")
             if unsubscribe:
                 unsubscribe()
-            unsubscribe = hass.data[DOMAIN][entry.entry_id].get("enhanced_unsubscribe")
+            unsubscribe = entry_state.get("enhanced_unsubscribe")
             if unsubscribe:
                 unsubscribe()
             enhanced.unload()
+            enhanced_average = entry_state.get("enhanced_average")
+            if enhanced_average is not None:
+                enhanced_average.unload()
 
-        hass.data[DOMAIN][entry.entry_id]["unload"]()
+        controllers = entry_state["controllers"]
+        for controller in controllers.values():
+            controller.unload()
+
+        entry_state["unload"]()
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unloaded
