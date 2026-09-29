@@ -41,6 +41,7 @@ views:
                 name: Legacy delta
           - type: markdown
             content: |
-              **Limitations:** the live load source remains the legacy two-day peak average.
-              The adaptive reserve and 7–30-day profile are pure components and are not yet
-              fed by actual PV feedback. This dashboard does not activate enhanced control.
+              **Limitations:** shadow planning uses the configured 7–30-day load profile,
+              but actual-PV feedback and adaptive reserve are not yet connected. The fixed
+              day buffer remains the diagnosed reserve fallback. This dashboard does not
+              activate enhanced control.

@@ -3,8 +3,12 @@ from pathlib import Path
 
 from custom_components.foxess_em.enhanced.replay import run_replay
 
-
-FIXTURE = Path(__file__).parents[1] / "fixtures" / "enhanced" / "synthetic_seven_day_replay.json"
+FIXTURE = (
+    Path(__file__).parents[1]
+    / "fixtures"
+    / "enhanced"
+    / "synthetic_seven_day_replay.json"
+)
 
 
 def test_synthetic_seven_day_fixture_runs_deterministically():
