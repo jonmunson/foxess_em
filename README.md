@@ -55,9 +55,9 @@ Recommend installation through [HACS][hacs]
 
 FoxESS EM Enhanced is an opt-in, disabled-by-default diagnostic path. It computes an enhanced target beside the legacy target and publishes five read-only sensors: **Enhanced Target**, **Charge Required**, **Reserve**, **Status**, and **Legacy Delta**. It never writes to an inverter, changes a schedule, invokes charge control, or publishes to the cloud. See [`docs/enhanced-shadow-mode.md`](docs/enhanced-shadow-mode.md) and the native dashboard example [`docs/dashboard-enhanced-shadow.yaml`](docs/dashboard-enhanced-shadow.yaml).
 
-Settings are `enhanced_enabled` (default `false`), forecast mode (`p10`, `p50`, `p90`, or `blend`), and a 7–30 day profile window. Missing forecast quantiles produce explicit fallback diagnostics. Local-time profile grouping is DST-aware, and adaptive reserve is bounded and based on positive forecast errors.
+Settings are `enhanced_enabled` (default `false`), forecast mode (`p10`, `p50`, `p90`, or `blend`), a 7–30 day load-history window, a P50–P90 load percentile, and all-days or weekday/weekend matching. Missing forecast quantiles produce explicit fallback diagnostics. The live shadow load profile is grouped in local wall-clock time and is DST-aware.
 
-Current limitations are intentional: the enhanced live-load source still uses the legacy two-day peak average; adaptive reserve and the 7–30-day profile are pure components not yet fed by actual PV feedback; and there is no live enhanced control. The committed seven-day replay is synthetic only; it is not live history.
+Current limitations are intentional: actual-PV feedback and adaptive reserve are not yet connected to live operation, so the configured fixed day buffer remains the reserve fallback. There is no live enhanced control. The committed seven-day replay is synthetic only; it is not your Home Assistant history.
 
 ## Configuration and Options
 

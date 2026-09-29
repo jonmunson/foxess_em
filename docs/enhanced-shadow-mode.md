@@ -9,15 +9,16 @@ The enhanced config step exposes:
 - `enhanced_enabled`: false by default; enables the shadow sensors.
 - `enhanced_mode`: `p10`, `p50`, `p90`, or `blend` forecast selection.
 - `enhanced_history_days`: a validated 7–30 day profile window.
+- `enhanced_load_percentile`: P50–P90 historical load selection.
+- `enhanced_load_match_mode`: combine all days or match weekdays/weekends.
 
 When enabled, five read-only sensors are published: **Enhanced Target**, **Charge Required**, **Reserve**, **Status**, and **Legacy Delta**. Their exact entity IDs depend on the config entry; replace the placeholders in [`dashboard-enhanced-shadow.yaml`](dashboard-enhanced-shadow.yaml).
 
-The planner reports fallback diagnostics when requested forecast quantiles are absent. `blend` uses available quantiles and falls back to the compatible `pv_estimate` value when necessary. Load grouping uses local wall-clock intervals and is DST-aware. The bounded adaptive reserve uses recent positive forecast errors only, then clamps the result to its configured minimum and maximum.
+The planner reports fallback diagnostics when requested forecast quantiles are absent. `blend` uses the midpoint of P10 and P50 and falls back to the compatible `pv_estimate` value when a quantile is absent. The live load model reads a separate 7–30-day Recorder window, applies the selected percentile per local minute, and can choose matching weekday/weekend profiles. The legacy two-day controller remains unchanged.
 
 ### Honest current limitations
 
-- The enhanced live-load source still uses the legacy two-day peak-average behavior.
-- Adaptive reserve and the 7–30-day profile are pure components, but are not yet fed by actual live PV feedback.
+- Actual-PV feedback and adaptive reserve are not connected to live operation; the fixed day buffer is used as a clearly diagnosed reserve fallback.
 - There is no live enhanced control: enhanced output is never passed to charge services, schedules, FoxESS cloud, or an inverter.
 
 ### Synthetic replay and privacy
@@ -32,4 +33,4 @@ Keep real exports under ignored paths such as `data/replay/`, `tests/fixtures/lo
 
 ### Not implemented
 
-This MVP intentionally does not claim 7–30-day live history, actual PV-feedback adaptation, cloud publishing, or enhanced inverter control. Those require separate production work and validation.
+This MVP intentionally does not claim actual PV-feedback adaptation, cloud publishing, or enhanced inverter control. Those require separate production work and validation.

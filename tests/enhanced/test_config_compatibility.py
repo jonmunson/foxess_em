@@ -7,6 +7,8 @@ from custom_components.foxess_em.const import (
     ENHANCED_DEFAULTS,
     ENHANCED_ENABLED,
     ENHANCED_HISTORY_DAYS,
+    ENHANCED_LOAD_MATCH_MODE,
+    ENHANCED_LOAD_PERCENTILE,
     ENHANCED_MODE,
 )
 
@@ -27,6 +29,8 @@ def test_enhanced_settings_validate_and_round_trip():
         ENHANCED_ENABLED: True,
         ENHANCED_MODE: "p10",
         ENHANCED_HISTORY_DAYS: 21,
+        ENHANCED_LOAD_PERCENTILE: 85,
+        ENHANCED_LOAD_MATCH_MODE: "all_days",
     }
 
     assert flow._enhanced_schema(configured) == configured

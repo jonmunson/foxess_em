@@ -5,10 +5,13 @@ from __future__ import annotations
 from datetime import datetime, time, timedelta
 import math
 from typing import Callable
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 from ..enhanced.forecast import select_forecast
+from .const import LoadMatchMode
+from .load_profile import build_load_profile, lookup_load
 from .planner import PlannerInput
 
 
@@ -38,6 +41,9 @@ class ReadOnlySnapshotProvider:
         eco_start_time: time | None = None,
         eco_end_time: time | None = None,
         now: Callable[[], datetime] | None = None,
+        history_days: int | None = None,
+        load_percentile: int = 75,
+        load_match_mode: str = "weekday_weekend",
     ):
         self.hass, self.average, self.forecast, self.battery = (
             hass,
@@ -56,22 +62,32 @@ class ReadOnlySnapshotProvider:
             eco_end_time,
         )
         self.now = now or (lambda: datetime.now().astimezone())
+        self.history_days = history_days
+        self.load_percentile = load_percentile
+        self.load_match_mode = LoadMatchMode(load_match_mode)
         self.last_diagnostics: tuple[str, ...] = ()
 
-    def _horizon(self, index: pd.DatetimeIndex) -> pd.Series:
+    def _window(self) -> tuple[datetime, datetime]:
         current = self.now()
         if current.tzinfo is None:
-            current = current.astimezone()
+            raise SnapshotUnavailable("clock_timezone_unavailable")
+        timezone_name = getattr(getattr(self.hass, "config", None), "time_zone", None)
+        timezone = ZoneInfo(timezone_name) if timezone_name else current.tzinfo
+        current = current.astimezone(timezone)
         start = datetime.combine(current.date(), self.eco_end, current.tzinfo)
         if start <= current:
             start += timedelta(days=1)
         end = datetime.combine(start.date(), self.eco_start, current.tzinfo)
         if end <= start:
             end += timedelta(days=1)
+        return start, end
+
+    def _horizon(self, index: pd.DatetimeIndex) -> pd.Series:
+        start, end = self._window()
         local = (
-            index.tz_convert(current.tzinfo)
+            index.tz_convert(start.tzinfo)
             if index.tz is not None
-            else index.tz_localize(current.tzinfo)
+            else index.tz_localize(start.tzinfo)
         )
         return (local >= start) & (local <= end)
 
@@ -80,14 +96,46 @@ class ReadOnlySnapshotProvider:
         if not (self.eco_start and self.eco_end):
             raise SnapshotUnavailable("eco_horizon_unavailable")
         try:
-            load = float(self.average.average_peak_house_load())
+            if self.history_days is None:
+                load = float(self.average.average_peak_house_load())
+                diagnostics.append("legacy_two_day_load_profile")
+            else:
+                frame = self.average.resample_data()
+                profile = build_load_profile(
+                    frame.rename(columns={"datetime": "timestamp"}),
+                    self.hass.config.time_zone,
+                    self.history_days,
+                    self.load_percentile,
+                    self.load_match_mode,
+                    interval_minutes=1,
+                    now=self.now(),
+                )
+                if profile.values.empty:
+                    raise ValueError
+                start, end = self._window()
+                minutes = pd.date_range(start, end, freq="1min", inclusive="both")
+                values = [
+                    lookup_load(profile, stamp.to_pydatetime(), self.load_match_mode)
+                    for stamp in minutes
+                ]
+                if not values or any(value is None for value in values):
+                    raise ValueError
+                load = float(sum(value for value in values if value is not None))
+                diagnostics.extend(
+                    (
+                        f"history_days:{self.history_days}",
+                        f"load_percentile:{self.load_percentile}",
+                        f"load_match_mode:{self.load_match_mode.value}",
+                    )
+                )
         except (AttributeError, TypeError, ValueError):
             raise SnapshotUnavailable(
-                "legacy_two_day_load_profile", "load_unavailable"
+                "enhanced_load_profile_unavailable", "load_unavailable"
             ) from None
         if not math.isfinite(load) or load < 0:
-            raise SnapshotUnavailable("legacy_two_day_load_profile", "load_invalid")
-        diagnostics.append("legacy_two_day_load_profile")
+            raise SnapshotUnavailable(
+                "enhanced_load_profile_unavailable", "load_invalid"
+            )
         try:
             frame = self.forecast.resample_data()
             if not isinstance(frame, pd.DataFrame) or frame.empty:

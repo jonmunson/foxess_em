@@ -21,6 +21,7 @@ try:
     from homeassistant.core_config import Config
 except ImportError:  # pragma: no cover
     from typing import Any as Config
+
 from homeassistant.helpers import config_validation
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -63,8 +64,8 @@ from .const import (
     STARTUP_MESSAGE,
     Connection,
 )
-from .forecast.forecast_controller import ForecastController
 from .enhanced.settings import normalize_settings
+from .forecast.forecast_controller import ForecastController
 from .forecast.solcast_api import SolcastApiClient
 from .fox.fox_cloud_api import FoxCloudApiClient
 from .fox.fox_cloud_service import FoxCloudService
@@ -214,26 +215,56 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         from .enhanced.controller import EnhancedController
         from .enhanced.snapshot import ReadOnlySnapshotProvider
 
-        provider = ReadOnlySnapshotProvider(
-            hass,
-            average_controller,
-            forecast_controller,
-            battery_controller,
-            battery_soc,
-            capacity,
-            user_min_soc,
-            max_charge_power_kw=(charge_amps * battery_volts / 1000),
-            fixed_day_buffer_kwh=day_buffer,
-            mode=enhanced[ENHANCED_MODE],
-            eco_start_time=eco_start_time,
-            eco_end_time=eco_end_time,
-        )
-        enhanced_controller = EnhancedController(True, provider)
+        enhanced_average = None
+        try:
+            enhanced_average = AverageController(
+                hass,
+                eco_start_time,
+                eco_end_time,
+                house_power,
+                aux_power,
+                history_days=enhanced[ENHANCED_HISTORY_DAYS],
+            )
+            await enhanced_average.async_refresh()
+            provider = ReadOnlySnapshotProvider(
+                hass,
+                enhanced_average,
+                forecast_controller,
+                battery_controller,
+                battery_soc,
+                capacity,
+                user_min_soc,
+                max_charge_power_kw=(charge_amps * battery_volts / 1000),
+                fixed_day_buffer_kwh=day_buffer,
+                mode=enhanced[ENHANCED_MODE],
+                eco_start_time=eco_start_time,
+                eco_end_time=eco_end_time,
+                history_days=enhanced[ENHANCED_HISTORY_DAYS],
+                load_percentile=enhanced["enhanced_load_percentile"],
+                load_match_mode=enhanced["enhanced_load_match_mode"],
+            )
+            enhanced_controller = EnhancedController(True, provider)
+            hass.data[DOMAIN][entry.entry_id]["enhanced_provider"] = provider
+            hass.data[DOMAIN][entry.entry_id]["enhanced_average"] = enhanced_average
+            hass.data[DOMAIN][entry.entry_id]["enhanced_unsubscribe"] = (
+                battery_controller.add_update_listener(
+                    enhanced_controller.update_callback
+                )
+            )
+            hass.data[DOMAIN][entry.entry_id]["enhanced_history_unsubscribe"] = (
+                enhanced_average.add_update_listener(
+                    enhanced_controller.update_callback
+                )
+            )
+        except Exception:  # defensive: recorder/history must not block legacy setup
+            _LOGGER.warning(
+                "Enhanced load history unavailable; continuing legacy setup",
+                exc_info=True,
+            )
+            if enhanced_average is not None:
+                enhanced_average.unload()
+            enhanced_controller = EnhancedController(True, None)
         hass.data[DOMAIN][entry.entry_id]["enhanced"] = enhanced_controller
-        hass.data[DOMAIN][entry.entry_id]["enhanced_provider"] = provider
-        hass.data[DOMAIN][entry.entry_id]["enhanced_unsubscribe"] = (
-            battery_controller.add_update_listener(enhanced_controller.update_callback)
-        )
         try:
             enhanced_controller.update()
         except Exception:  # defensive: enhanced must not block legacy setup
@@ -283,6 +314,14 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             controller.unload()
         enhanced = hass.data[DOMAIN][entry.entry_id].get("enhanced")
         if enhanced is not None:
+            enhanced_average = hass.data[DOMAIN][entry.entry_id].get("enhanced_average")
+            if enhanced_average is not None:
+                enhanced_average.unload()
+            unsubscribe = hass.data[DOMAIN][entry.entry_id].get(
+                "enhanced_history_unsubscribe"
+            )
+            if unsubscribe:
+                unsubscribe()
             unsubscribe = hass.data[DOMAIN][entry.entry_id].get("enhanced_unsubscribe")
             if unsubscribe:
                 unsubscribe()

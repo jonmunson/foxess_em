@@ -27,15 +27,16 @@ class AverageController(UnloadController, CallbackController, HassLoadController
         eco_end_time: time,
         house_power: str,
         aux_power: list[str],
+        history_days: int = 2,
     ) -> None:
         self._hass = hass
         self._last_update = None
 
         entities = {
-            "house_load_7d": TrackedSensor(
-                HistorySensor(house_power, timedelta(days=2), False),
+            "house_load_history": TrackedSensor(
+                HistorySensor(house_power, timedelta(days=history_days), False),
                 [
-                    HistorySensor(sensor, timedelta(days=2), False)
+                    HistorySensor(sensor, timedelta(days=history_days), False)
                     for sensor in aux_power
                 ],
             )

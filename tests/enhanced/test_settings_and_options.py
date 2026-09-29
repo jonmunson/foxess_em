@@ -9,6 +9,8 @@ from custom_components.foxess_em.config_flow import EnhancedOptionsFlowHandler
 from custom_components.foxess_em.const import (
     ENHANCED_ENABLED,
     ENHANCED_HISTORY_DAYS,
+    ENHANCED_LOAD_MATCH_MODE,
+    ENHANCED_LOAD_PERCENTILE,
     ENHANCED_MODE,
 )
 from custom_components.foxess_em.enhanced.settings import normalize_settings
@@ -43,6 +45,8 @@ def test_options_schema_uses_options_then_data_defaults():
         ENHANCED_ENABLED: True,
         ENHANCED_MODE: "p90",
         ENHANCED_HISTORY_DAYS: 8,
+        ENHANCED_LOAD_PERCENTILE: 75,
+        ENHANCED_LOAD_MATCH_MODE: "weekday_weekend",
     }
 
 
@@ -50,11 +54,19 @@ def test_options_submission_contains_only_enhanced_keys():
     entry = SimpleNamespace(data={}, options={})
     result = asyncio.run(
         EnhancedOptionsFlowHandler(entry).async_step_init(
-            {ENHANCED_ENABLED: True, ENHANCED_MODE: "blend", ENHANCED_HISTORY_DAYS: 21}
+            {
+                ENHANCED_ENABLED: True,
+                ENHANCED_MODE: "blend",
+                ENHANCED_HISTORY_DAYS: 21,
+                ENHANCED_LOAD_PERCENTILE: 80,
+                ENHANCED_LOAD_MATCH_MODE: "all_days",
+            }
         )
     )
     assert result["data"] == {
         ENHANCED_ENABLED: True,
         ENHANCED_MODE: "blend",
         ENHANCED_HISTORY_DAYS: 21,
+        ENHANCED_LOAD_PERCENTILE: 80,
+        ENHANCED_LOAD_MATCH_MODE: "all_days",
     }

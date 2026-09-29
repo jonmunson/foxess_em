@@ -29,6 +29,8 @@ from .const import (
     ENHANCED_DEFAULTS,
     ENHANCED_ENABLED,
     ENHANCED_HISTORY_DAYS,
+    ENHANCED_LOAD_MATCH_MODE,
+    ENHANCED_LOAD_PERCENTILE,
     ENHANCED_MODE,
     FOX_API_KEY,
     FOX_CLOUD,
@@ -214,6 +216,12 @@ class BatteryManagerFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                         ENHANCED_HISTORY_DAYS, ENHANCED_DEFAULTS[ENHANCED_HISTORY_DAYS]
                     ),
                 ): vol.All(vol.Coerce(int), vol.Range(min=7, max=30)),
+                vol.Required(ENHANCED_LOAD_PERCENTILE, default=75): vol.All(
+                    vol.Coerce(int), vol.Range(min=50, max=90)
+                ),
+                vol.Required(
+                    ENHANCED_LOAD_MATCH_MODE, default="weekday_weekend"
+                ): vol.In(["all_days", "weekday_weekend"]),
             }
         )
 
@@ -481,6 +489,22 @@ class EnhancedOptionsFlowHandler(config_entries.OptionsFlow):
                         self._config_entry.data.get(ENHANCED_HISTORY_DAYS, 14),
                     ),
                 ): vol.All(vol.Coerce(int), vol.Range(min=7, max=30)),
+                vol.Required(
+                    ENHANCED_LOAD_PERCENTILE,
+                    default=self._config_entry.options.get(
+                        ENHANCED_LOAD_PERCENTILE,
+                        self._config_entry.data.get(ENHANCED_LOAD_PERCENTILE, 75),
+                    ),
+                ): vol.All(vol.Coerce(int), vol.Range(min=50, max=90)),
+                vol.Required(
+                    ENHANCED_LOAD_MATCH_MODE,
+                    default=self._config_entry.options.get(
+                        ENHANCED_LOAD_MATCH_MODE,
+                        self._config_entry.data.get(
+                            ENHANCED_LOAD_MATCH_MODE, "weekday_weekend"
+                        ),
+                    ),
+                ): vol.In(["all_days", "weekday_weekend"]),
             }
         )
         if user_input is not None:
