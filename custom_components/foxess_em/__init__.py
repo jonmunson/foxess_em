@@ -21,6 +21,7 @@ try:
     from homeassistant.core_config import Config
 except ImportError:  # pragma: no cover
     from typing import Any as Config
+
 from homeassistant.helpers import config_validation
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -45,6 +46,9 @@ from .const import (
     DOMAIN,
     ECO_END_TIME,
     ECO_START_TIME,
+    ENHANCED_ENABLED,
+    ENHANCED_HISTORY_DAYS,
+    ENHANCED_MODE,
     FOX_API_KEY,
     FOX_CLOUD,
     FOX_MODBUS_HOST,
@@ -60,6 +64,7 @@ from .const import (
     STARTUP_MESSAGE,
     Connection,
 )
+from .enhanced.settings import normalize_settings
 from .forecast.forecast_controller import ForecastController
 from .forecast.solcast_api import SolcastApiClient
 from .fox.fox_cloud_api import FoxCloudApiClient
@@ -85,21 +90,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # fails, which will prevent setup working when the FoxESS API key is fixed.
     entry_options = copy.deepcopy(dict(entry.options))
     entry_data = copy.deepcopy(dict(entry.data))
-    _LOGGER.debug("Options %s", entry.options)
-    _LOGGER.debug("Data %s", entry.data)
+    # Never log complete mappings: they contain API keys, hosts and entity IDs.
+    _LOGGER.debug(
+        "Config loaded: options=%s data_keys=%s",
+        bool(entry_options),
+        sorted(entry_data),
+    )
 
-    if entry_options and entry_options != entry_data:
-        # overwrite data with options, force update as not allowed to access entries directly
-        hass.config_entries.async_update_entry(
-            entry,
-            data=entry_options,
-            version=BatteryManagerFlowHandler.VERSION,
-        )
-        entry_data = copy.deepcopy(dict(entry.options))
-        _LOGGER.debug("Config has been updated")
-    _LOGGER.debug("Data %s", entry.data)
-
+    entry_data.update(entry_options)
     connection_type = entry_data.get(CONNECTION_TYPE, FOX_MODBUS_TCP)
+    enhanced = normalize_settings(entry_data)
+    enhanced_enabled = enhanced[ENHANCED_ENABLED]
+    _LOGGER.debug(
+        "Enhanced shadow settings normalized: enabled=%s mode=%s history_days=%s",
+        enhanced_enabled,
+        enhanced[ENHANCED_MODE],
+        enhanced[ENHANCED_HISTORY_DAYS],
+    )
+
     fox_api_key = entry_data.get(FOX_API_KEY)
     if connection_type == FOX_CLOUD:
         if not fox_api_key:
@@ -203,7 +211,67 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         },
     }
 
-    # Add callbacks into battery controller for updates
+    if enhanced_enabled:
+        from .enhanced.controller import EnhancedController
+        from .enhanced.snapshot import ReadOnlySnapshotProvider
+
+        enhanced_average = None
+        try:
+            enhanced_average = AverageController(
+                hass,
+                eco_start_time,
+                eco_end_time,
+                house_power,
+                aux_power,
+                history_days=enhanced[ENHANCED_HISTORY_DAYS],
+            )
+            await enhanced_average.async_refresh()
+            provider = ReadOnlySnapshotProvider(
+                hass,
+                enhanced_average,
+                forecast_controller,
+                battery_controller,
+                battery_soc,
+                capacity,
+                user_min_soc,
+                max_charge_power_kw=(charge_amps * battery_volts / 1000),
+                fixed_day_buffer_kwh=day_buffer,
+                mode=enhanced[ENHANCED_MODE],
+                eco_start_time=eco_start_time,
+                eco_end_time=eco_end_time,
+                history_days=enhanced[ENHANCED_HISTORY_DAYS],
+                load_percentile=enhanced["enhanced_load_percentile"],
+                load_match_mode=enhanced["enhanced_load_match_mode"],
+            )
+            enhanced_controller = EnhancedController(True, provider)
+            hass.data[DOMAIN][entry.entry_id]["enhanced_provider"] = provider
+            hass.data[DOMAIN][entry.entry_id]["enhanced_average"] = enhanced_average
+            hass.data[DOMAIN][entry.entry_id]["enhanced_unsubscribe"] = (
+                battery_controller.add_update_listener(
+                    enhanced_controller.update_callback
+                )
+            )
+            hass.data[DOMAIN][entry.entry_id]["enhanced_history_unsubscribe"] = (
+                enhanced_average.add_update_listener(
+                    enhanced_controller.update_callback
+                )
+            )
+        except Exception:  # defensive: recorder/history must not block legacy setup
+            _LOGGER.warning(
+                "Enhanced load history unavailable; continuing legacy setup",
+                exc_info=True,
+            )
+            if enhanced_average is not None:
+                enhanced_average.unload()
+            enhanced_controller = EnhancedController(True, None)
+        hass.data[DOMAIN][entry.entry_id]["enhanced"] = enhanced_controller
+        try:
+            enhanced_controller.update()
+        except Exception:  # defensive: enhanced must not block legacy setup
+            _LOGGER.warning(
+                "Initial enhanced update failed; continuing legacy setup", exc_info=True
+            )
+
     forecast_controller.add_update_listener(battery_controller)
     average_controller.add_update_listener(battery_controller)
 
@@ -241,11 +309,28 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     if unloaded:
-        controllers = hass.data[DOMAIN][entry.entry_id]["controllers"]
+        entry_state = hass.data[DOMAIN][entry.entry_id]
+        enhanced = entry_state.get("enhanced")
+        if enhanced is not None:
+            # Detach cross-controller listeners before unloading either side.
+            # This is safe with today's no-op listener return values and avoids
+            # stale callbacks if controllers later return real unsubscribe hooks.
+            unsubscribe = entry_state.get("enhanced_history_unsubscribe")
+            if unsubscribe:
+                unsubscribe()
+            unsubscribe = entry_state.get("enhanced_unsubscribe")
+            if unsubscribe:
+                unsubscribe()
+            enhanced.unload()
+            enhanced_average = entry_state.get("enhanced_average")
+            if enhanced_average is not None:
+                enhanced_average.unload()
+
+        controllers = entry_state["controllers"]
         for controller in controllers.values():
             controller.unload()
 
-        hass.data[DOMAIN][entry.entry_id]["unload"]()
+        entry_state["unload"]()
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unloaded

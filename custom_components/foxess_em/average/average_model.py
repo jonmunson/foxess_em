@@ -110,10 +110,10 @@ class AverageModel:
 
     def _house_load_resample(self) -> pd.DataFrame:
         """Resample house load and deduct secondary sensors"""
-        house_load_values = self._tracked_sensors["house_load_7d"].primary.values
+        house_load_values = self._tracked_sensors["house_load_history"].primary.values
         house_load_resample = self._resample_data(house_load_values)
 
-        for aux in self._tracked_sensors["house_load_7d"].secondary:
+        for aux in self._tracked_sensors["house_load_history"].secondary:
             aux_load_resample = self._resample_data(aux.values)
             aux_load_resample["load"] = aux_load_resample["load"] / 1000
             house_load_resample["load"] -= aux_load_resample["load"]
@@ -136,7 +136,7 @@ class AverageModel:
 
     def average_all_house_load(self) -> float:
         """House load today"""
-        days = self._tracked_sensors["house_load_7d"].primary.period.days
+        days = self._tracked_sensors["house_load_history"].primary.period.days
 
         l_df = self._resampled
 
@@ -144,7 +144,7 @@ class AverageModel:
 
     def average_peak_house_load(self) -> float:
         """House load peak"""
-        days = self._tracked_sensors["house_load_7d"].primary.period.days
+        days = self._tracked_sensors["house_load_history"].primary.period.days
 
         eco_start = (
             datetime.now()

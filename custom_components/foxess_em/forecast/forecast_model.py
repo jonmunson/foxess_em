@@ -110,6 +110,9 @@ class ForecastModel:
         df["period_start"] = pd.to_datetime(df.index.values, utc=True)
         df["period_start_iso"] = df["period_start"].map(lambda x: x.isoformat())
         df["pv_estimate"] = df["pv_estimate"] / 60
+        for source, target in (("pv_estimate10", "pv_p10"), ("pv_estimate90", "pv_p90")):
+            if source in df:
+                df[target] = df[source] / 60
         df["pv_watts"] = df["pv_estimate"] * 1000
         df["time"] = df.index.time
         df["date"] = df.index.date

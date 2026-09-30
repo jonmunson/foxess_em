@@ -69,25 +69,16 @@ class SolcastApiClient:
         if (history is None) | (live is None):
             raise NoDataError("Forecast data could not be processed")
 
-        history_estimates = [
-            {
-                "period_start": dateutil.parser.isoparse(forecast["period_end"])
-                - timedelta(minutes=30),
+        def normalize(forecast):
+            return {
+                "period_start": dateutil.parser.isoparse(forecast["period_end"]) - timedelta(minutes=30),
                 "period_end": dateutil.parser.isoparse(forecast["period_end"]),
                 "pv_estimate": forecast["pv_estimate"],
+                **({k: forecast[k] for k in ("pv_estimate10", "pv_estimate90") if k in forecast}),
             }
-            for forecast in history["estimated_actuals"]
-        ]
 
-        live_estimates = [
-            {
-                "period_start": dateutil.parser.isoparse(forecast["period_end"])
-                - timedelta(minutes=30),
-                "period_end": dateutil.parser.isoparse(forecast["period_end"]),
-                "pv_estimate": forecast["pv_estimate"],
-            }
-            for forecast in live["forecasts"]
-        ]
+        history_estimates = [normalize(forecast) for forecast in history["estimated_actuals"]]
+        live_estimates = [normalize(forecast) for forecast in live["forecasts"]]
 
         return history_estimates[1:] + live_estimates
 

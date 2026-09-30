@@ -52,6 +52,21 @@ BATTERY_SOC = "battery_soc"
 CHARGE_AMPS = "charge_amps"
 BATTERY_VOLTS = "battery_volts"
 
+# Enhanced planner options (namespaced and disabled for existing entries).
+ENHANCED_ENABLED = "enhanced_enabled"
+ENHANCED_MODE = "enhanced_mode"
+ENHANCED_HISTORY_DAYS = "enhanced_history_days"
+ENHANCED_LOAD_PERCENTILE = "enhanced_load_percentile"
+ENHANCED_LOAD_MATCH_MODE = "enhanced_load_match_mode"
+ENHANCED_DEFAULTS = {
+    ENHANCED_ENABLED: False,
+    ENHANCED_MODE: "p50",
+    ENHANCED_HISTORY_DAYS: 14,
+    ENHANCED_LOAD_PERCENTILE: 75,
+    ENHANCED_LOAD_MATCH_MODE: "weekday_weekend",
+}
+ENHANCED_MODES = ("p10", "p50", "p90", "blend")
+
 
 # Connection types
 class Connection(Enum):

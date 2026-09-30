@@ -1,0 +1,47 @@
+# Replace every `example_*` entity ID with your own entities.
+# This is a native Home Assistant dashboard view, not an active control configuration.
+title: FoxESS Enhanced Shadow
+views:
+  - title: Enhanced shadow
+    path: foxess-enhanced-shadow
+    type: sections
+    sections:
+      - type: grid
+        cards:
+          - type: markdown
+            content: |
+              ## Read-only shadow comparison
+              Enhanced targets are diagnostic only. Enhanced control and inverter writes are not enabled.
+          - type: statistics-graph
+            title: Target comparison
+            chart_type: line
+            period: day
+            entities:
+              - sensor.example_foxess_em_legacy_target
+              - sensor.example_foxess_em_enhanced_target_kwh
+              - sensor.example_foxess_em_legacy_delta_kwh
+          - type: history-graph
+            title: Reserve and target delta
+            hours_to_show: 168
+            entities:
+              - sensor.example_foxess_em_enhanced_reserve_kwh
+              - sensor.example_foxess_em_legacy_delta_kwh
+          - type: entities
+            title: Enhanced diagnostics
+            entities:
+              - entity: sensor.example_foxess_em_enhanced_status
+                name: Status
+              - entity: sensor.example_foxess_em_enhanced_target_kwh
+                name: Enhanced target
+              - entity: sensor.example_foxess_em_enhanced_charge_required_kwh
+                name: Charge required
+              - entity: sensor.example_foxess_em_enhanced_reserve_kwh
+                name: Reserve
+              - entity: sensor.example_foxess_em_legacy_delta_kwh
+                name: Legacy delta
+          - type: markdown
+            content: |
+              **Limitations:** shadow planning uses the configured 7–30-day load profile,
+              but actual-PV feedback and adaptive reserve are not yet connected. The fixed
+              day buffer remains the diagnosed reserve fallback. This dashboard does not
+              activate enhanced control.

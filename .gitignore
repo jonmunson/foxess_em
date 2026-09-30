@@ -7,3 +7,20 @@ venv
 home-assistant_v2.db
 custom_components/hacs
 config
+# Local/private replay and Home Assistant exports
+.env
+.env.*
+*.pem
+*.key
+*.token
+*.secret
+replay/
+private/
+exports/
+data/replay/
+tests/fixtures/local/
+*.export.json
+*.secrets.yaml
+*.db
+*.db-shm
+*.db-wal
