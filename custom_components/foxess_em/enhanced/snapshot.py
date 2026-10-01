@@ -140,6 +140,14 @@ class ReadOnlySnapshotProvider:
             frame = self.forecast.resample_data()
             if not isinstance(frame, pd.DataFrame) or frame.empty:
                 raise ValueError
+            frame = frame.copy()
+            if "period_start" in frame:
+                timestamps = pd.to_datetime(
+                    frame["period_start"], errors="coerce", utc=True
+                )
+                if timestamps.isna().all():
+                    raise ValueError
+                frame.index = pd.DatetimeIndex(timestamps)
             weights = None
             if self.mode == "blend":
                 # Conservative midpoint between Solcast P10 and P50.

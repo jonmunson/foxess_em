@@ -117,6 +117,15 @@ def test_missing_quantile_falls_back_to_central_forecast():
     assert "p10 fallback to p50" in source.last_diagnostics
 
 
+def test_snapshot_uses_period_start_after_legacy_model_resets_forecast_index():
+    frame = forecast_frame().reset_index(names="period_start")
+
+    planner_input, _legacy = provider(frame=frame)()
+
+    assert planner_input.pv_kwh == 3.0
+    assert isinstance(frame.index, pd.RangeIndex)
+
+
 @pytest.mark.parametrize("state", [None, "unknown", "nan"])
 def test_snapshot_rejects_missing_or_invalid_soc(state):
     with pytest.raises(SnapshotUnavailable) as error:
