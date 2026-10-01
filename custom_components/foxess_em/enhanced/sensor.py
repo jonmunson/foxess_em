@@ -32,6 +32,8 @@ class EnhancedDiagnosticSensor(SensorEntity):
 
     @property
     def available(self):
+        if self._key == "status":
+            return bool(self._controller.enabled)
         return bool(
             self._controller.enabled
             and self._controller.status not in {"disabled", "unavailable"}

@@ -48,5 +48,10 @@ def test_disabled_and_unavailable_sensors_do_not_publish_values():
     unavailable = EnhancedController(True)
     unavailable.update_callback()
     unavailable_entities = sensors(unavailable, SimpleNamespace(entry_id="entry-3"))
-    assert all(not entity.available for entity in unavailable_entities)
-    assert all(entity.native_value is None for entity in unavailable_entities)
+    status = next(entity for entity in unavailable_entities if entity._key == "status")
+    numeric = [entity for entity in unavailable_entities if entity._key != "status"]
+    assert status.available
+    assert status.native_value == "unavailable"
+    assert status.extra_state_attributes["diagnostics"] == ["provider_unavailable"]
+    assert all(not entity.available for entity in numeric)
+    assert all(entity.native_value is None for entity in numeric)
