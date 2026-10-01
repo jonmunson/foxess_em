@@ -284,6 +284,11 @@ def test_enabled_shadow_is_read_only_and_unload_reload_is_clean(
     assert patched_root.writes == []
     assert len(state["controllers"]["battery"].listeners) == 1
     assert len(state["enhanced_average"].listeners) == 1
+    assert state["controllers"]["battery"].listeners[0] is state["enhanced"]
+    assert state["enhanced_average"].listeners[0] is state["enhanced"]
+    state["controllers"]["battery"].listeners[0].update_callback()
+    state["enhanced_average"].listeners[0].update_callback()
+    assert state["enhanced"].status == "ok"
     first_controllers = tuple(state["controllers"].values())
     first_history = state["enhanced_average"]
     assert asyncio.run(async_unload_entry(hass, first_entry)) is True

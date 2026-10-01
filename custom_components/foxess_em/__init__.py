@@ -247,14 +247,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             hass.data[DOMAIN][entry.entry_id]["enhanced_provider"] = provider
             hass.data[DOMAIN][entry.entry_id]["enhanced_average"] = enhanced_average
             hass.data[DOMAIN][entry.entry_id]["enhanced_unsubscribe"] = (
-                battery_controller.add_update_listener(
-                    enhanced_controller.update_callback
-                )
+                battery_controller.add_update_listener(enhanced_controller)
             )
             hass.data[DOMAIN][entry.entry_id]["enhanced_history_unsubscribe"] = (
-                enhanced_average.add_update_listener(
-                    enhanced_controller.update_callback
-                )
+                enhanced_average.add_update_listener(enhanced_controller)
             )
         except Exception:  # defensive: recorder/history must not block legacy setup
             _LOGGER.warning(
